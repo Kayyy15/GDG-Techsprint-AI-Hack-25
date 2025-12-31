@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Navigation System</title>
+    <!-- Add Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+
+        /* Authentication Styles */
+        .auth-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .auth-btn {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .auth-btn:hover {
+            background: #5568d3;
+        }
+
+        .auth-btn.secondary {
+            background: #6c757d;
+        }
+
+        .auth-btn.secondary:hover {
+            background: #5a6268;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+
+        .suggestions.show {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: #f0f0f0;
+        }
+
+        .button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .button:hover {
+            background: #5568d3;
+        }
+
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .map-container {
+            flex: 1;
+            background: white;
+            margin: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        #svgContainer {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+        }
+
+        /* SVG Styles */
+        .room {
+            fill: #e0e0e0;
+            stroke: #333;
+            stroke-width: 1;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .room:hover {
+            fill: #b3d9ff;
+            stroke-width: 2;
+        }
+
+        .room.start {
+            fill: #4caf50;
+            stroke: #2e7d32;
+            stroke-width: 3;
+        }
+
+        .room.end {
+            fill: #f44336;
+            stroke: #c62828;
+            stroke-width: 3;
+        }
+
+        .room.path {
+            fill: #90caf9;
+            stroke: #1976d2;
+            stroke-width: 2;
+        }
+
+        .node {
+            fill: transparent;
+            cursor: pointer;
+        }
+
+        .node:hover {
+            fill: #ffd54f;
+            opacity: 0.8;
+        }
+
+        .node.path-node {
+            fill: #1976d2;
+            stroke: white;
+            stroke-width: 2;
+            r: 6;
+        }
+
+        .path-line {
+            stroke: #1976d2;
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            animation: dash 1s linear infinite;
+            stroke-dasharray: 10, 5;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -15;
+            }
+        }
+
+        /* Info Panel with Path History */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            width: 350px;
+            max-height: 80vh;
+            display: none;
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        .info-panel.show {
+            display: block;
+        }
+
+        .info-panel h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .info-panel p {
+            margin: 5px 0;
+            color: #666;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        /* Path History Styles */
+        .path-history {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .path-history h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .history-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .history-item .time {
+            color: #6c757d;
+            font-size: 11px;
+        }
+
+        .history-item .route {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .clear-history-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .clear-history-btn:hover {
+            background: #c82333;
+        }
+
+        /* Auth Modal */
+        .auth-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .auth-modal.show {
+            display: flex;
+        }
+
+        .auth-form {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        .auth-form h3 {
+            margin-bottom: 20px;
+            color: #667eea;
+            text-align: center;
+        }
+
+        .auth-form input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .auth-form .button {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+
+        .auth-tab.active {
+            border-bottom: 3px solid #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .auth-error {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .auth-success {
+            color: #28a745;
+            font-size: 12px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Save Path Button */
+        .save-path-btn {
+            margin-top: 15px;
+            background: #28a745;
+        }
+
+        .save-path-btn:hover {
+            background: #218838;
+        }
+
+        .save-path-btn:disabled {
+            background: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <h1>🗺️ Campus Navigation System</h1>
+            <div class="auth-container" id="authContainer">
+                <div id="userInfo" class="user-info" style="display: none;">
+                    <div class="user-avatar" id="userAvatar"></div>
+                    <span id="userEmail"></span>
+                    <button class="auth-btn secondary" id="signOutBtn">Sign Out</button>
+                </div>
+                <button class="auth-btn" id="signInBtn">Sign In</button>
+            </div>
+        </div>
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search for a room (e.g., T-001, Library, Canteen)...">
+                <div id="suggestions" class="suggestions"></div>
+            </div>
+            <button class="button" id="findPathBtn" disabled>Find Path</button>
+            <button class="button" id="savePathBtn" disabled>Save Path</button>
+            <button class="button" id="clearBtn">Clear</button>
+        </div>
+    </div>
+
+    <div class="map-container">
+        <div id="svgContainer"></div>
+        
+        <div id="infoPanel" class="info-panel">
+            <button class="close-btn" id="closeInfo">&times;</button>
+            <h3 id="infoTitle">Room Information</h3>
+            <div id="infoContent"></div>
+            <div id="pathInfo" class="path-info"></div>
+            <div id="savePathSection" style="display: none;">
+                <button class="button save-path-btn" id="savePathBtnPanel">Save This Path</button>
+            </div>
+            <div class="path-history" id="pathHistorySection" style="display: none;">
+                <h4>Your Path History</h4>
+                <div id="historyList"></div>
+                <button class="clear-history-btn" id="clearHistoryBtn">Clear History</button>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4caf50;"></div>
+                <span>Start Point</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f44336;"></div>
+                <span>Destination</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #1976d2;"></div>
+                <span>Path</span>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="auth-modal">
+        <div class="auth-form">
+            <div class="auth-tabs">
+                <div class="auth-tab active" data-tab="signin">Sign In</div>
+                <div class="auth-tab" data-tab="signup">Sign Up</div>
+            </div>
+            
+            <div id="signinForm">
+                <h3>Sign In</h3>
+                <input type="email" id="signinEmail" placeholder="Email">
+                <input type="password" id="signinPassword" placeholder="Password">
+                <button class="button" id="signinBtn">Sign In</button>
+                <div id="signinError" class="auth-error"></div>
+                <div id="signinSuccess" class="auth-success"></div>
+            </div>
+            
+            <div id="signupForm" style="display: none;">
+                <h3>Sign Up</h3>
+                <input type="text" id="signupName" placeholder="Full Name">
+                <input type="email" id="signupEmail" placeholder="Email">
+                <input type="password" id="signupPassword" placeholder="Password (min. 6 characters)">
+                <button class="button" id="signupBtn">Sign Up</button>
+                <div id="signupError" class="auth-error"></div>
+                <div id="signupSuccess" class="auth-success"></div>
+            </div>
+            
+            <button class="button secondary" id="closeAuthModal" style="margin-top: 15px;">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // ===================== FIREBASE CONFIGURATION =====================
+        // Replace with your Firebase project configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCwqNcDvKj9aKcW8Qe7mQlBvT9fXn5s9T0",
+            authDomain: "campus-navigation-system.firebaseapp.com",
+            projectId: "campus-navigation-system",
+            storageBucket: "campus-navigation-system.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef1234567890abcdef"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ===================== APPLICATION STATE =====================
+        let selectedStart = null;
+        let selectedEnd = null;
+        let svgDoc = null;
+        let currentUser = null;
+        let currentPath = null;
+        let pathHistory = [];
+
+        // ===================== INITIALIZATION =====================
+        async function initialize() {
+            // Load the SVG
+            document.getElementById('svgContainer').innerHTML = `
+                <svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g id="Rooms" clip-path="url(#clip0_2_2)">
+                <rect width="1200" height="800" fill="#D9D9D9"/>
+                <rect id="PCE_AREA" x="68.5" y="19.5" width="639" height="545" fill="#D9D9D9" stroke="black"/>
+                <circle id="NODE_T3" class="node" cx="533" cy="519" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_L2" class="node" cx="695" cy="285" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <rect id="QUAD_AREA" x="177.5" y="114.5" width="338" height="363" fill="#D9D9D9" stroke="black"/>
+                <text id="T-WING" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="310" y="465.8">T-WING</tspan></text>
+                <text id="P-WING" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="529" y="471.8">P-WING</tspan></text>
+                <text id="J-WING" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="876" y="528.8">J-WING</tspan></text>
+                <text id="ATRIUM" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="756" y="208.8">ATRIUM</tspan></text>
+                <text id="THE QUAD" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="327" y="283.8">THE QUAD</tspan></text>
+                <text id="R-WING" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="322" y="138.8">R-WING</tspan></text>
+                <text id="L-WING" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="519" y="163.8">L-WING</tspan></text>
+                <text id="S-WING" transform="matrix(0 1 -1 0 261 272)" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="0" y="11.8">S-WING</tspan></text>
+                <text id="O-WING" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="455" y="286.8">O-WING</tspan></text>
+                <rect id="S_002" class="room" x="68.5" y="382.5" width="80" height="53" fill="#D9D9D9" stroke="black"/>
+                <path id="Vector 5" d="M491 91.5695L537.5 70H683V522H633" stroke="black"/>
+                <rect id="R_004_005" class="room" x="437.5" y="53.5" width="54" height="39" fill="#D9D9D9" stroke="black"/>
+                <rect id="PLAYGROUND" class="room" x="32.5" y="643.5" width="460" height="127" fill="#D9D9D9" stroke="#1B0D0D"/>
+                <rect id="COURT" class="room" x="523.5" y="676.5" width="275" height="94" fill="#D9D9D9" stroke="black"/>
+                <rect id="PARKING" class="room" x="820.5" y="657.5" width="287" height="113" fill="#D9D9D9" stroke="black"/>
+                <rect id="WORKSHOP" class="room" x="1124.5" y="593.5" width="58" height="177" fill="#D9D9D9" stroke="black"/>
+                <rect id="T_001" class="room" x="169.5" y="499.5" width="271" height="65" fill="#D9D9D9" stroke="black"/>
+                <circle id="NODE_ST" class="node" cx="162" cy="487" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_T2" class="node" cx="533" cy="487" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_S1" class="node" cx="496" cy="103" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_S2" class="node" cx="542" cy="82" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_L1" class="node" cx="695" cy="82" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_ATR1_CORR" class="node" cx="795" cy="82" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_ATR2_CORR" class="node" cx="862" cy="15" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_GATE2" class="node" cx="1062" cy="15" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_L4" class="node" cx="695" cy="519" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_SR" class="node" cx="162" cy="103" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <rect id="Rectangle 7" class="room" x="439.5" y="499.5" width="71" height="50" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_003" class="room" x="68.5" y="328.5" width="80" height="55" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_001A" class="room" x="68.5" y="435.5" width="38" height="34" fill="#D9D9D9" stroke="black"/>
+                <rect id="LIFT_2" class="room" x="87.5" y="34.5" width="37" height="34" fill="#D9D9D9" stroke="black"/>
+                <rect id="LIFT_1" class="room" x="78.5" y="514.5" width="37" height="34" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_001B" class="room" x="106.5" y="435.5" width="42" height="34" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_005" class="room" x="68.5" y="113.5" width="80" height="98" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_004" class="room" x="68.5" y="211.5" width="80" height="51" fill="#D9D9D9" stroke="black"/>
+                <text id="RECEPTION" transform="matrix(0 1 -1 0 175 275)" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="11" letter-spacing="0em"><tspan x="0" y="6.39">RECEPTION</tspan></text>
+                <text id="T-001" transform="translate(192 508)" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="11" letter-spacing="0em"><tspan x="0" y="6.39">T-001</tspan></text>
+                <path id="Vector 3" d="M97 113V212" stroke="black"/>
+                <rect id="FEES_COUNTER" class="room" x="68.5" y="113.5" width="28" height="25" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_006_007" class="room" x="177.5" y="114.5" width="52" height="63" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_008_009" class="room" x="177.5" y="176.5" width="80" height="87" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_010_011" class="room" x="177.5" y="330.5" width="80" height="99" fill="#D9D9D9" stroke="black"/>
+                <rect id="S_012_013" class="room" x="177.5" y="429.5" width="52" height="48" fill="#D9D9D9" stroke="black"/>
+                <rect id="R_001" class="room" x="179.5" y="32.5" width="107" height="60" fill="#D9D9D9" stroke="black"/>
+                <rect id="R_002" class="room" x="285.5" y="32.5" width="100" height="60" fill="#D9D9D9" stroke="black"/>
+                <rect id="R_003" class="room" x="384.5" y="32.5" width="54" height="60" fill="#D9D9D9" stroke="black"/>
+                <rect id="L_001" class="room" x="538.5" y="33.5" width="84" height="36" fill="#D9D9D9" stroke="black"/>
+                <rect id="LIFT3" class="room" x="649.5" y="36.5" width="33" height="33" fill="#D9D9D9" stroke="black"/>
+                <rect id="PCACS_LIBRARY" class="room" x="576.5" y="107.5" width="106" height="138" fill="#D9D9D9" stroke="black"/>
+                <rect id="OLD_CANTEEN" class="room" x="576.5" y="314.5" width="106" height="130" fill="#D9D9D9" stroke="black"/>
+                <g id="THE_QUAD">
+                <mask id="path-55-inside-1_2_2"  fill="white">
+                <path d="M557 254H683V305H557V337H514V225H557V254Z"/>
+                </mask>
+                <path d="M557 254H683V305H557V337H514V225H557V254Z" fill="#D9D9D9"/>
+                <path d="M557 254H556V255H557V254ZM683 254H684V253H683V254ZM683 305V306H684V305H683ZM557 305V304H556V305H557ZM557 337V338H558V337H557ZM514 337H513V338H514V337ZM514 225V224H513V225H514ZM557 225H558V224H557V225ZM557 254V255H683V254V253H557V254ZM683 254H682V305H683H684V254H683ZM683 305V304H557V305V306H683V305ZM557 305H556V337H557H558V305H557ZM557 337V336H514V337V338H557V337ZM514 337H515V225H514H513V337H514ZM514 225V226H557V225V224H514V225ZM557 225H556V254H557H558V225H557Z" fill="black" mask="url(#path-55-inside-1_2_2)"/>
+                </g>
+                <rect id="P_002" class="room" x="576.5" y="529.5" width="64" height="69" fill="#D9D9D9" stroke="black"/>
+                <g id="J_001">
+                <mask id="path-58-inside-2_2_2" fill="white">
+                <path d="M984 620H683V529H708V550H984V620Z"/>
+                </mask>
+                <path d="M984 620H683V529H708V550H984V620Z" fill="#D9D9D9"/>
+                <path d="M984 620V621H985V620H984ZM683 620H682V621H683V620ZM683 529V528H682V529H683ZM708 529H709V528H708V529ZM708 550H707V551H708V550ZM984 550H985V549H984V550ZM984 620V619H683V620V621H984V620ZM683 620H684V529H683H682V620H683ZM683 529V530H708V529V528H683V529ZM708 529H707V550H708H709V529H708ZM708 550V551H984V550V549H708V550ZM984 550H983V620H984H985V550H984Z" fill="black" mask="url(#path-58-inside-2_2_2)"/>
+                </g>
+                <rect id="Rectangle 30" class="room" x="982.5" y="550.5" width="31" height="69" fill="#D9D9D9" stroke="black"/>
+                <rect id="STORE_ROOM" class="room" x="998.5" y="566.5" width="15" height="26" fill="#D9D9D9" stroke="black"/>
+                <rect id="J_002" class="room" x="1012.5" y="502.5" width="65" height="64" fill="#D9D9D9" stroke="black"/>
+                <rect id="STAIRCASE2" class="room" x="708.5" y="470.5" width="149" height="40" fill="#D9D9D9" stroke="black"/>
+                <path id="Vector 9" d="M708 393C742.484 440.649 814.06 454.263 860 393" stroke="black"/>
+                <path id="Vector 10" d="M858 310C823.97 262.351 753.336 248.737 708 310" stroke="black"/>
+                <path id="Vector 11" d="M858 269C823.97 221.351 753.336 207.737 708 269" stroke="black"/>
+                <path id="Ellipse 1" d="M784.5 217.5C803.872 217.5 819.5 231.868 819.5 249.5C819.5 267.132 803.872 281.5 784.5 281.5C765.128 281.5 749.5 267.132 749.5 249.5C749.5 231.868 765.128 217.5 784.5 217.5Z" fill="#D9D9D9" stroke="black"/>
+                <rect id="CANTEEN" class="room" x="860.5" y="26.5" width="165" height="164" fill="#D9D9D9" stroke="black"/>
+                <g id="ATRIUM_STAIRCASE1">
+                <rect class="room" x="738.5" y="470.5" width="32" height="26" fill="#D9D9D9"/>
+                <rect x="738.5" y="470.5" width="32" height="26" stroke="black"/>
+                <rect x="738.5" y="470.5" width="32" height="26" stroke="black"/>
+                </g>
+                <g id="ATRIUM_STAIRCASE2">
+                <rect class="room" x="791.5" y="470.5" width="32" height="26" fill="#D9D9D9"/>
+                <rect x="791.5" y="470.5" width="32" height="26" stroke="black"/>
+                <rect x="791.5" y="470.5" width="32" height="26" stroke="black"/>
+                </g>
+                <rect id="STAIRCASE1" class="room" x="603.5" y="484.5" width="71" height="37" fill="#D9D9D9" stroke="black"/>
+                <rect id="RECEPTION_2" class="room" x="176.5" y="282.5" width="36" height="31" fill="#D9D9D9" stroke="black"/>
+                <path id="Vector 12" d="M237 263V332" stroke="black"/>
+                <path id="Vector 14" d="M707.5 55H859" stroke="black"/>
+                <rect id="MAIN_GATE" class="room" x="-22.5" y="522.5" width="62" height="76" fill="#D9D9D9" stroke="black"/>
+                <rect id="GATE_2" class="room" x="1070.5" y="-38.5" width="85" height="76" fill="#D9D9D9" stroke="black"/>
+                <rect id="P_001" class="room" x="640.5" y="529.5" width="25" height="69" fill="#D9D9D9" stroke="black"/>
+                <rect id="J_003" class="room" x="1012.5" y="566.5" width="64" height="53" fill="#D9D9D9" stroke="black"/>
+                <rect id="ATRIUM_2" class="room" x="771.5" y="236.5" width="27" height="24" fill="#D9D9D9" stroke="#B54C4C"/>
+                <g id="ARCHITECTURE_BLDG">
+                <mask id="path-80-inside-3_2_2" 
+                fill="white">
+                <path d="M1014 228H999V261H1026V450H948V502H858V261H957V228H889V191H1014V228Z"/>
+                </mask>
+                <path d="M1014 228H999V261H1026V450H948V502H858V261H957V228H889V191H1014V228Z" fill="#D9D9D9"/>
+                <path d="M1014 228V229H1015V228H1014ZM999 228V227H998V228H999ZM999 261H998V262H999V261ZM1026 261H1027V260H1026V261ZM1026 450V451H1027V450H1026ZM948 450V449H947V450H948ZM948 502V503H949V502H948ZM858 502H857V503H858V502ZM858 261V260H857V261H858ZM957 261V262H958V261H957ZM957 228H958V227H957V228ZM889 228H888V229H889V228ZM889 191V190H888V191H889ZM1014 191H1015V190H1014V191ZM1014 228V227H999V228V229H1014V228ZM999 228H998V261H999H1000V228H999ZM999 261V262H1026V261V260H999V261ZM1026 261H1025V450H1026H1027V261H1026ZM1026 450V449H948V450V451H1026V450ZM948 450H947V502H948H949V450H948ZM948 502V501H858V502V503H948V502ZM858 502H859V261H858H857V502H858ZM858 261V262H957V261V260H858V261ZM957 261H958V228H957H956V261H957ZM957 228V227H889V228V229H957V228ZM889 228H890V191H889H888V228H889ZM889 191V192H1014V191V190H889V191ZM1014 191H1013V228H1014H1015V191H1014Z" fill="black" mask="url(#path-80-inside-3_2_2)"/>
+                </g>
+                <text id="FEES COUNTER" transform="matrix(0 1 -1 0 85 147)" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="11" letter-spacing="0em"><tspan x="0" y="6.39">FEES COUNTER</tspan></text>
+                <text id="PLAYGROUND_2" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="213" y="706.8">PLAYGROUND</tspan></text>
+                <text id="COURT_2" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="635" y="730.8">COURT</tspan></text>
+                <text id="PARKING_2" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="937" y="718.8">PARKING</tspan></text>
+                <text id="WORKSHOP_2" transform="matrix(0 1 -1 0 1166 640)" fill="black" xml:space="preserve" style="white-space: pre" font-family="Katibeh" font-size="20" letter-spacing="0em"><tspan x="0" y="11.8">WORKSHOP</tspan></text>
+                <circle id="ENTRANCE_NODE" class="node" cx="13" cy="610" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_1" class="node" cx="54" cy="610" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_2" class="node" cx="158" cy="610" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_C6" class="node" cx="533" cy="610" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_C5" class="node" cx="626" cy="651" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_C4" class="node" cx="998" cy="647" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_C3" class="node" cx="1104" cy="647" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_C2" class="node" cx="1096" cy="474" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_C1" class="node" cx="1062" cy="246" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_L3" class="node" cx="538" cy="285" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_S1_2" class="node" cx="162" cy="298" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_S004_008" class="node" cx="162" cy="236" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_S005_006" class="node" cx="162" cy="148" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_R001" class="node" cx="217" cy="103" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_R002" class="node" cx="323" cy="103" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_R003" class="node" cx="416" cy="103" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_R004_005" class="node" cx="465" cy="103" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_L001" class="node" cx="566" cy="82" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_LIFT3" class="node" cx="662" cy="82" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_ATR1" class="node" cx="740" cy="261" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_ATR2" class="node" cx="785" cy="250" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_ATR3" class="node" cx="836" cy="269" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_CANT1" class="node" cx="979" cy="269" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_CANT2" class="node" cx="979" cy="201" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_J4" class="node" cx="848" cy="456" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_J3" class="node" cx="808" cy="456" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_J2" class="node" cx="759" cy="456" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_J1" class="node" cx="699" cy="456" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_STR_ROOM" class="node" cx="998" cy="602" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_LIB_PCACS" class="node" cx="566" cy="209" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_OC" class="node" cx="566" cy="344" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_OC_1" class="node" cx="566" cy="439" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_T001" class="node" cx="384" cy="487" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_S003_010" class="node" cx="162" cy="356" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_S002_010" class="node" cx="162" cy="400" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_S001_012" class="node" cx="162" cy="454" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_LIFT2" class="node" cx="129" cy="77" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_LIFT1" class="node" cx="124" cy="507" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_P002" class="node" cx="591" cy="519" r="4" fill="#2897FF" fill-opacity="0.67"/>
+                <circle id="NODE_3" class="node" cx="54" cy="298" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                <circle id="NODE_4" class="node" cx="54" cy="131" r="4" fill="#FF2828" fill-opacity="0.67"/>
+                </g>
+                <defs>
+                <clipPath id="clip0_2_2">
+                <rect width="1200" height="800" fill="white"/>
+                </clipPath>
+                </defs>
+                </svg>
+            `;
+            
+            svgDoc = document.querySelector('svg');
+            
+            // Add event listeners to rooms
+            svgDoc.addEventListener('click', function(e) {
+                const target = e.target;
+                if (target.classList.contains('room')) {
+                    selectRoom(target.id);
+                }
+            });
+            
+            // Setup Firebase Auth
+            setupFirebaseAuth();
+            
+            // Setup search functionality
+            setupSearch();
+            
+            // Setup button events
+            setupButtons();
+            
+            console.log('Campus Navigation System initialized with Firebase');
+        }
+
+        // ===================== FIREBASE AUTHENTICATION =====================
+        function setupFirebaseAuth() {
+            // Listen for auth state changes
+            auth.onAuthStateChanged(async (user) => {
+                currentUser = user;
+                if (user) {
+                    // User is signed in
+                    showUserInfo(user);
+                    await loadPathHistory(user.uid);
+                    document.getElementById('signInBtn').style.display = 'none';
+                    document.getElementById('userInfo').style.display = 'flex';
+                } else {
+                    // User is signed out
+                    document.getElementById('signInBtn').style.display = 'block';
+                    document.getElementById('userInfo').style.display = 'none';
+                    document.getElementById('pathHistorySection').style.display = 'none';
+                }
+            });
+
+            // Auth modal tabs
+            document.querySelectorAll('.auth-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    if (tab.dataset.tab === 'signin') {
+                        document.getElementById('signinForm').style.display = 'block';
+                        document.getElementById('signupForm').style.display = 'none';
+                    } else {
+                        document.getElementById('signinForm').style.display = 'none';
+                        document.getElementById('signupForm').style.display = 'block';
+                    }
+                });
+            });
+
+            // Sign in
+            document.getElementById('signinBtn').addEventListener('click', async () => {
+                const email = document.getElementById('signinEmail').value;
+                const password = document.getElementById('signinPassword').value;
+                
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                    document.getElementById('signinError').textContent = '';
+                    document.getElementById('authModal').classList.remove('show');
+                    showMessage('Successfully signed in!', 'success');
+                } catch (error) {
+                    document.getElementById('signinError').textContent = error.message;
+                }
+            });
+
+            // Sign up
+            document.getElementById('signupBtn').addEventListener('click', async () => {
+                const name = document.getElementById('signupName').value;
+                const email = document.getElementById('signupEmail').value;
+                const password = document.getElementById('signupPassword').value;
+                
+                if (password.length < 6) {
+                    document.getElementById('signupError').textContent = 'Password must be at least 6 characters';
+                    return;
+                }
+                
+                try {
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    // Store additional user info
+                    await db.collection('users').doc(userCredential.user.uid).set({
+                        name: name,
+                        email: email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    document.getElementById('signupError').textContent = '';
+                    document.getElementById('authModal').classList.remove('show');
+                    showMessage('Account created successfully!', 'success');
+                } catch (error) {
+                    document.getElementById('signupError').textContent = error.message;
+                }
+            });
+
+            // Sign out
+            document.getElementById('signOutBtn').addEventListener('click', () => {
+                auth.signOut();
+                showMessage('Signed out successfully', 'info');
+            });
+
+            // Open auth modal
+            document.getElementById('signInBtn').addEventListener('click', () => {
+                document.getElementById('authModal').classList.add('show');
+            });
+
+            // Close auth modal
+            document.getElementById('closeAuthModal').addEventListener('click', () => {
+                document.getElementById('authModal').classList.remove('show');
+            });
+        }
+
+        // ===================== PATH HISTORY =====================
+        async function savePathToHistory(startRoom, endRoom, path, distance) {
+            if (!currentUser) return;
+            
+            const pathData = {
+                userId: currentUser.uid,
+                startRoom: startRoom,
+                endRoom: endRoom,
+                path: path,
+                distance: distance,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            try {
+                await db.collection('pathHistory').add(pathData);
+                showMessage('Path saved to history!', 'success');
+                await loadPathHistory(currentUser.uid);
+            } catch (error) {
+                console.error('Error saving path:', error);
+                showMessage('Failed to save path', 'error');
+            }
+        }
+
+        async function loadPathHistory(userId) {
+            try {
+                const snapshot = await db.collection('pathHistory')
+                    .where('userId', '==', userId)
+                    .orderBy('timestamp', 'desc')
+                    .limit(10)
+                    .get();
+                
+                pathHistory = [];
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    historyList.innerHTML = '<p style="color: #666; font-size: 12px; text-align: center;">No path history yet</p>';
+                    return;
+                }
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    pathHistory.push(data);
+                    
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    historyItem.innerHTML = `
+                        <div class="route">${data.startRoom.name} → ${data.endRoom.name}</div>
+                        <div class="distance">${Math.round(data.distance)} units</div>
+                        <div class="time">${formatFirestoreTimestamp(data.timestamp)}</div>
+                    `;
+                    historyList.appendChild(historyItem);
+                });
+                
+                document.getElementById('pathHistorySection').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading path history:', error);
+            }
+        }
+
+        async function clearPathHistory() {
+            if (!currentUser) return;
+            
+            if (confirm('Are you sure you want to clear your path history?')) {
+                try {
+                    const snapshot = await db.collection('pathHistory')
+                        .where('userId', '==', currentUser.uid)
+                        .get();
+                    
+                    const batch = db.batch();
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    
+                    await batch.commit();
+                    await loadPathHistory(currentUser.uid);
+                    showMessage('History cleared!', 'success');
+                } catch (error) {
+                    console.error('Error clearing history:', error);
+                    showMessage('Failed to clear history', 'error');
+                }
+            }
+        }
+
+        // ===================== HELPER FUNCTIONS =====================
+        function showUserInfo(user) {
+            document.getElementById('userEmail').textContent = user.email;
+            const avatar = document.getElementById('userAvatar');
+            const initials = user.email.substring(0, 2).toUpperCase();
+            avatar.textContent = initials;
+        }
+
+        function formatFirestoreTimestamp(timestamp) {
+            if (!timestamp) return '';
+            const date = timestamp.toDate();
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.position = 'fixed';
+            messageDiv.style.top = '20px';
+            messageDiv.style.right = '20px';
+            messageDiv.style.padding = '15px 20px';
+            messageDiv.style.borderRadius = '8px';
+            messageDiv.style.color = 'white';
+            messageDiv.style.zIndex = '1002';
+            messageDiv.style.fontWeight = '600';
+            messageDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+            
+            if (type === 'success') {
+                messageDiv.style.background = '#28a745';
+            } else if (type === 'error') {
+                messageDiv.style.background = '#dc3545';
+            } else {
+                messageDiv.style.background = '#17a2b8';
+            }
+            
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        // ===================== MODIFIED FUNCTIONS =====================
+        function selectRoom(roomId) {
+            const roomEl = svgDoc.getElementById(roomId);
+            if (!roomEl) return;
+
+            if (!selectedStart) {
+                selectedStart = roomId;
+                roomEl.classList.add('start');
+                showInfo(roomId, 'Start Point');
+            } else if (!selectedEnd && roomId !== selectedStart) {
+                selectedEnd = roomId;
+                roomEl.classList.add('end');
+                showInfo(roomId, 'Destination');
+                document.getElementById('findPathBtn').disabled = false;
+            }
+        }
+
+        async function findPathBetweenRooms() {
+            if (!selectedStart || !selectedEnd) return;
+            
+            showLoading(true);
+            
+            // Clear previous path
+            clearPath();
+            
+            // Get start and end nodes
+            const startNode = roomToNode[selectedStart];
+            const endNode = roomToNode[selectedEnd];
+            
+            if (!startNode || !endNode) {
+                alert('Pathfinding error: Could not find navigation nodes for selected rooms.');
+                showLoading(false);
+                return;
+            }
+            
+            // Find path using Dijkstra's algorithm
+            const path = findPath(startNode, endNode);
+            
+            if (path && path.length > 1) {
+                // Draw the path
+                drawPath(path);
+                
+                // Calculate total distance
+                let totalDistance = 0;
+                for (let i = 0; i < path.length - 1; i++) {
+                    totalDistance += calculateDistance(path[i], path[i + 1]);
+                }
+                
+                // Store current path for saving
+                currentPath = {
+                    path: path,
+                    distance: totalDistance,
+                    startRoom: rooms.find(r => r.id === selectedStart),
+                    endRoom: rooms.find(r => r.id === selectedEnd)
+                };
+                
+                // Update info panel with path details
+                const infoContent = document.getElementById('infoContent');
+                const pathInfo = `
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                        <p><strong>Path Found:</strong> ${currentPath.startRoom.name} → ${currentPath.endRoom.name}</p>
+                        <p><strong>Distance:</strong> ${Math.round(totalDistance)} units</p>
+                        <p><strong>Route:</strong> ${path.length} navigation points</p>
+                    </div>
+                `;
+                infoContent.innerHTML += pathInfo;
+                
+                // Show save button if user is logged in
+                if (currentUser) {
+                    document.getElementById('savePathSection').style.display = 'block';
+                }
+            } else {
+                alert('No path found between the selected locations.');
+            }
+            
+            showLoading(false);
+        }
+
+        async function saveCurrentPath() {
+            if (!currentPath || !currentUser) return;
+            
+            try {
+                await savePathToHistory(
+                    currentPath.startRoom,
+                    currentPath.endRoom,
+                    currentPath.path,
+                    currentPath.distance
+                );
+            } catch (error) {
+                console.error('Error saving path:', error);
+                showMessage('Failed to save path', 'error');
+            }
+        }
+
+        // ===================== SETUP BUTTONS =====================
+        function setupButtons() {
+            document.getElementById('findPathBtn').addEventListener('click', findPathBetweenRooms);
+            document.getElementById('savePathBtn').addEventListener('click', saveCurrentPath);
+            document.getElementById('savePathBtnPanel').addEventListener('click', saveCurrentPath);
+            document.getElementById('clearBtn').addEventListener('click', clearSelection);
+            document.getElementById('closeInfo').addEventListener('click', () => {
+                document.getElementById('infoPanel').classList.remove('show');
+            });
+            document.getElementById('clearHistoryBtn').addEventListener('click', clearPathHistory);
+        }
+
+        // ===================== ROOMS DATA AND PATHFINDING FUNCTIONS =====================
+        const rooms = [
+            { id: 'T_001', name: 'T-001', wing: 'T-Wing', type: 'Classroom' },
+            { id: 'P_001', name: 'P-001', wing: 'P-Wing', type: 'Classroom' },
+            { id: 'P_002', name: 'P-002', wing: 'P-Wing', type: 'Classroom' },
+            { id: 'J_001', name: 'J-001', wing: 'J-Wing', type: 'Classroom' },
+            { id: 'J_002', name: 'J-002', wing: 'J-Wing', type: 'Office' },
+            { id: 'J_003', name: 'J-003', wing: 'J-Wing', type: 'Storage' },
+            { id: 'S_002', name: 'S-002', wing: 'S-Wing', type: 'Classroom' },
+            { id: 'S_003', name: 'S-003', wing: 'S-Wing', type: 'Classroom' },
+            { id: 'S_001A', name: 'S-001A', wing: 'S-Wing', type: 'Office' },
+            { id: 'S_001B', name: 'S-001B', wing: 'S-Wing', type: 'Office' },
+            { id: 'S_004', name: 'S-004', wing: 'S-Wing', type: 'Classroom' },
+            { id: 'S_005', name: 'S-005', wing: 'S-Wing', type: 'Classroom' },
+            { id: 'S_006_007', name: 'S-006/007', wing: 'S-Wing', type: 'Classroom' },
+            { id: 'S_008_009', name: 'S-008/009', wing: 'S-Wing', type: 'Classroom' },
+            { id: 'S_010_011', name: 'S-010/011', wing: 'S-Wing', type: 'Classroom' },
+            { id: 'S_012_013', name: 'S-012/013', wing: 'S-Wing', type: 'Storage' },
+            { id: 'R_001', name: 'R-001', wing: 'R-Wing', type: 'Classroom' },
+            { id: 'R_002', name: 'R-002', wing: 'R-Wing', type: 'Classroom' },
+            { id: 'R_003', name: 'R-003', wing: 'R-Wing', type: 'Classroom' },
+            { id: 'R_004_005', name: 'R-004/005', wing: 'R-Wing', type: 'Conference' },
+            { id: 'L_001', name: 'L-001', wing: 'L-Wing', type: 'Library' },
+            { id: 'PCACS_LIBRARY', name: 'PCACS Library', wing: 'L-Wing', type: 'Library' },
+            { id: 'OLD_CANTEEN', name: 'Old Canteen', wing: 'L-Wing', type: 'Cafeteria' },
+            { id: 'CANTEEN', name: 'Canteen', wing: 'Atrium', type: 'Cafeteria' },
+            { id: 'RECEPTION_2', name: 'Reception', wing: 'S-Wing', type: 'Reception' },
+            { id: 'FEES_COUNTER', name: 'Fees Counter', wing: 'S-Wing', type: 'Administrative' },
+            { id: 'PLAYGROUND', name: 'Playground', wing: 'Outside', type: 'Sports' },
+            { id: 'COURT', name: 'Court', wing: 'Outside', type: 'Sports' },
+            { id: 'PARKING', name: 'Parking', wing: 'Outside', type: 'Parking' },
+            { id: 'WORKSHOP', name: 'Workshop', wing: 'Outside', type: 'Workshop' },
+            { id: 'MAIN_GATE', name: 'Main Gate', wing: 'Entrance', type: 'Entrance' },
+            { id: 'GATE_2', name: 'Gate 2', wing: 'Entrance', type: 'Entrance' },
+            { id: 'LIFT_1', name: 'Lift 1', wing: 'S-Wing', type: 'Elevator' },
+            { id: 'LIFT_2', name: 'Lift 2', wing: 'S-Wing', type: 'Elevator' },
+            { id: 'LIFT3', name: 'Lift 3', wing: 'Atrium', type: 'Elevator' },
+            { id: 'STAIRCASE1', name: 'Staircase 1', wing: 'P-Wing', type: 'Stairs' },
+            { id: 'STAIRCASE2', name: 'Staircase 2', wing: 'Atrium', type: 'Stairs' },
+            { id: 'STORE_ROOM', name: 'Store Room', wing: 'J-Wing', type: 'Storage' },
+            { id: 'ATRIUM_STAIRCASE1', name: 'Atrium Staircase 1', wing: 'Atrium', type: 'Stairs' },
+            { id: 'ATRIUM_STAIRCASE2', name: 'Atrium Staircase 2', wing: 'Atrium', type: 'Stairs' }
+        ];
+
+        const nodeConnections = {
+            // Main pathways
+            'ENTRANCE_NODE': ['NODE_1'],
+            'NODE_1': ['ENTRANCE_NODE', 'NODE_2', 'NODE_4'],
+            'NODE_2': ['NODE_1', 'NODE_LIFT1', 'NODE_ST', 'NODE_C6'],
+            'NODE_ST': ['NODE_2', 'NODE_T001'],
+            'NODE_T001': ['NODE_ST', 'NODE_T2'],
+            'NODE_T2': ['NODE_T001', 'NODE_T3', 'NODE_P002'],
+            'NODE_T3': ['NODE_T2', 'NODE_L4', 'NODE_L3'],
+            'NODE_L4': ['NODE_T3', 'NODE_J1'],
+            'NODE_L3': ['NODE_T3', 'NODE_L2', 'NODE_OC'],
+            'NODE_L2': ['NODE_L3', 'NODE_L1', 'NODE_LIB_PCACS'],
+            'NODE_L1': ['NODE_L2', 'NODE_L001', 'NODE_LIFT3'],
+            'NODE_L001': ['NODE_L1', 'NODE_R004_005'],
+            'NODE_R004_005': ['NODE_L001', 'NODE_S1'],
+            'NODE_S1': ['NODE_R004_005', 'NODE_S2'],
+            'NODE_S2': ['NODE_S1', 'NODE_LIFT2'],
+            'NODE_LIFT2': ['NODE_S2', 'NODE_SR'],
+            'NODE_SR': ['NODE_LIFT2', 'NODE_S005_006'],
+            'NODE_S005_006': ['NODE_SR', 'NODE_R001', 'NODE_S004_008'],
+            'NODE_R001': ['NODE_S005_006', 'NODE_R002'],
+            'NODE_R002': ['NODE_R001', 'NODE_R003'],
+            'NODE_R003': ['NODE_R002', 'NODE_R004_005'],
+            'NODE_S004_008': ['NODE_S005_006', 'NODE_3'],
+            'NODE_3': ['NODE_S004_008', 'NODE_S1_2'],
+            'NODE_S1_2': ['NODE_3', 'NODE_S003_010'],
+            'NODE_S003_010': ['NODE_S1_2', 'NODE_S002_010'],
+            'NODE_S002_010': ['NODE_S003_010', 'NODE_S001_012'],
+            'NODE_S001_012': ['NODE_S002_010', 'NODE_LIFT1'],
+            'NODE_LIFT1': ['NODE_S001_012', 'NODE_2'],
+            
+            // Atrium connections
+            'NODE_LIFT3': ['NODE_L1', 'NODE_ATR1_CORR'],
+            'NODE_ATR1_CORR': ['NODE_LIFT3', 'NODE_ATR2_CORR'],
+            'NODE_ATR2_CORR': ['NODE_ATR1_CORR', 'NODE_GATE2'],
+            'NODE_GATE2': ['NODE_ATR2_CORR'],
+            
+            // J-Wing connections
+            'NODE_J1': ['NODE_L4', 'NODE_J2'],
+            'NODE_J2': ['NODE_J1', 'NODE_J3'],
+            'NODE_J3': ['NODE_J2', 'NODE_J4'],
+            'NODE_J4': ['NODE_J3', 'NODE_C2'],
+            
+            // Outside connections
+            'NODE_C6': ['NODE_2', 'NODE_C5'],
+            'NODE_C5': ['NODE_C6', 'NODE_C4'],
+            'NODE_C4': ['NODE_C5', 'NODE_STR_ROOM', 'NODE_C3'],
+            'NODE_C3': ['NODE_C4'],
+            'NODE_C2': ['NODE_J4', 'NODE_C1'],
+            'NODE_C1': ['NODE_C2'],
+            
+            // Facility connections
+            'NODE_LIB_PCACS': ['NODE_L2'],
+            'NODE_OC': ['NODE_L3', 'NODE_OC_1'],
+            'NODE_OC_1': ['NODE_OC'],
+            'NODE_P002': ['NODE_T2'],
+            'NODE_STR_ROOM': ['NODE_C4'],
+            
+            // Atrium internal
+            'NODE_ATR1': ['NODE_ATR2'],
+            'NODE_ATR2': ['NODE_ATR1', 'NODE_ATR3'],
+            'NODE_ATR3': ['NODE_ATR2', 'NODE_CANT1'],
+            'NODE_CANT1': ['NODE_ATR3', 'NODE_CANT2'],
+            'NODE_CANT2': ['NODE_CANT1']
+        };
+
+        const roomToNode = {
+            'T_001': 'NODE_T001',
+            'P_001': 'NODE_T2',
+            'P_002': 'NODE_P002',
+            'J_001': 'NODE_J1',
+            'J_002': 'NODE_C2',
+            'J_003': 'NODE_C3',
+            'S_002': 'NODE_S002_010',
+            'S_003': 'NODE_S003_010',
+            'S_001A': 'NODE_S001_012',
+            'S_001B': 'NODE_S001_012',
+            'S_004': 'NODE_S004_008',
+            'S_005': 'NODE_S005_006',
+            'S_006_007': 'NODE_S005_006',
+            'S_008_009': 'NODE_S004_008',
+            'S_010_011': 'NODE_S1_2',
+            'S_012_013': 'NODE_S001_012',
+            'R_001': 'NODE_R001',
+            'R_002': 'NODE_R002',
+            'R_003': 'NODE_R003',
+            'R_004_005': 'NODE_R004_005',
+            'L_001': 'NODE_L001',
+            'PCACS_LIBRARY': 'NODE_LIB_PCACS',
+            'OLD_CANTEEN': 'NODE_OC',
+            'CANTEEN': 'NODE_CANT1',
+            'RECEPTION_2': 'NODE_S1_2',
+            'FEES_COUNTER': 'NODE_SR',
+            'PLAYGROUND': 'NODE_C5',
+            'COURT': 'NODE_C5',
+            'PARKING': 'NODE_C4',
+            'WORKSHOP': 'NODE_C3',
+            'MAIN_GATE': 'ENTRANCE_NODE',
+            'GATE_2': 'NODE_GATE2',
+            'LIFT_1': 'NODE_LIFT1',
+            'LIFT_2': 'NODE_LIFT2',
+            'LIFT3': 'NODE_LIFT3',
+            'STAIRCASE1': 'NODE_P002',
+            'STAIRCASE2': 'NODE_J1',
+            'STORE_ROOM': 'NODE_STR_ROOM',
+            'ATRIUM_STAIRCASE1': 'NODE_ATR1',
+            'ATRIUM_STAIRCASE2': 'NODE_ATR2'
+        };
+
+        // Get node coordinates from SVG
+        function getNodeCoordinates(nodeId) {
+            const node = document.getElementById(nodeId);
+            if (node) {
+                const cx = parseFloat(node.getAttribute('cx'));
+                const cy = parseFloat(node.getAttribute('cy'));
+                return { x: cx, y: cy };
+            }
+            return null;
+        }
+
+        // Calculate Euclidean distance
+        function calculateDistance(node1, node2) {
+            const pos1 = getNodeCoordinates(node1);
+            const pos2 = getNodeCoordinates(node2);
+            if (!pos1 || !pos2) return Infinity;
+            
+            const dx = pos2.x - pos1.x;
+            const dy = pos2.y - pos1.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // Dijkstra's algorithm for pathfinding
+        function findPath(startNode, endNode) {
+            const distances = {};
+            const previous = {};
+            const unvisited = new Set();
+            const path = [];
+            
+            // Initialize distances
+            for (const node in nodeConnections) {
+                distances[node] = Infinity;
+                previous[node] = null;
+                unvisited.add(node);
+            }
+            distances[startNode] = 0;
+            
+            while (unvisited.size > 0) {
+                // Find unvisited node with smallest distance
+                let currentNode = null;
+                let smallestDistance = Infinity;
+                
+                for (const node of unvisited) {
+                    if (distances[node] < smallestDistance) {
+                        smallestDistance = distances[node];
+                        currentNode = node;
+                    }
+                }
+                
+                if (currentNode === null || smallestDistance === Infinity) {
+                    break;
+                }
+                
+                if (currentNode === endNode) {
+                    // Build the path
+                    while (previous[currentNode]) {
+                        path.unshift(currentNode);
+                        currentNode = previous[currentNode];
+                    }
+                    path.unshift(startNode);
+                    return path;
+                }
+                
+                unvisited.delete(currentNode);
+                
+                // Update distances to neighbors
+                const neighbors = nodeConnections[currentNode] || [];
+                for (const neighbor of neighbors) {
+                    if (unvisited.has(neighbor)) {
+                        const alt = distances[currentNode] + calculateDistance(currentNode, neighbor);
+                        if (alt < distances[neighbor]) {
+                            distances[neighbor] = alt;
+                            previous[neighbor] = currentNode;
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+
+        // Setup search functionality
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const suggestions = document.getElementById('suggestions');
+            
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                if (query.length < 2) {
+                    suggestions.classList.remove('show');
+                    return;
+                }
+
+                const filtered = rooms.filter(room => 
+                    room.name.toLowerCase().includes(query) || 
+                    room.wing.toLowerCase().includes(query) ||
+                    room.type.toLowerCase().includes(query)
+                );
+
+                if (filtered.length > 0) {
+                    suggestions.innerHTML = filtered.map(room => 
+                        `<div class="suggestion-item" data-id="${room.id}">${room.name} - ${room.wing} (${room.type})</div>`
+                    ).join('');
+                    suggestions.classList.add('show');
+                } else {
+                    suggestions.classList.remove('show');
+                }
+            });
+
+            suggestions.addEventListener('click', (e) => {
+                if (e.target.classList.contains('suggestion-item')) {
+                    const roomId = e.target.dataset.id;
+                    selectRoom(roomId);
+                    searchInput.value = '';
+                    suggestions.classList.remove('show');
+                }
+            });
+
+            // Close suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.contains(e.target) && !suggestions.contains(e.target)) {
+                    suggestions.classList.remove('show');
+                }
+            });
+        }
+
+        // Setup button events
+        function setupButtons() {
+            document.getElementById('findPathBtn').addEventListener('click', findPathBetweenRooms);
+            document.getElementById('clearBtn').addEventListener('click', clearSelection);
+            document.getElementById('closeInfo').addEventListener('click', () => {
+                document.getElementById('infoPanel').classList.remove('show');
+            });
+        }
+
+        // Room selection
+        function selectRoom(roomId) {
+            const roomEl = svgDoc.getElementById(roomId);
+            if (!roomEl) return;
+
+            if (!selectedStart) {
+                selectedStart = roomId;
+                roomEl.classList.add('start');
+                showInfo(roomId, 'Start Point');
+            } else if (!selectedEnd && roomId !== selectedStart) {
+                selectedEnd = roomId;
+                roomEl.classList.add('end');
+                showInfo(roomId, 'Destination');
+                document.getElementById('findPathBtn').disabled = false;
+            }
+        }
+
+        // Show info panel
+        function showInfo(roomId, label) {
+            const room = rooms.find(r => r.id === roomId);
+            const infoPanel = document.getElementById('infoPanel');
+            const infoTitle = document.getElementById('infoTitle');
+            const infoContent = document.getElementById('infoContent');
+
+            if (room) {
+                infoTitle.textContent = room.name;
+                infoContent.innerHTML = `
+                    <p><strong>Wing:</strong> ${room.wing}</p>
+                    <p><strong>Type:</strong> ${room.type}</p>
+                    <p><strong>Role:</strong> ${label}</p>
+                `;
+                infoPanel.classList.add('show');
+            }
+        }
+
+        // Find path between selected rooms
+        function findPathBetweenRooms() {
+            if (!selectedStart || !selectedEnd) return;
+            
+            showLoading(true);
+            
+            // Clear previous path
+            clearPath();
+            
+            // Get start and end nodes
+            const startNode = roomToNode[selectedStart];
+            const endNode = roomToNode[selectedEnd];
+            
+            if (!startNode || !endNode) {
+                alert('Pathfinding error: Could not find navigation nodes for selected rooms.');
+                showLoading(false);
+                return;
+            }
+            
+            // Find path using Dijkstra's algorithm
+            const path = findPath(startNode, endNode);
+            
+            if (path && path.length > 1) {
+                // Draw the path
+                drawPath(path);
+                
+                // Calculate total distance
+                let totalDistance = 0;
+                for (let i = 0; i < path.length - 1; i++) {
+                    totalDistance += calculateDistance(path[i], path[i + 1]);
+                }
+                
+                // Update info panel with path details
+                const startRoom = rooms.find(r => r.id === selectedStart);
+                const endRoom = rooms.find(r => r.id === selectedEnd);
+                const infoContent = document.getElementById('infoContent');
+                infoContent.innerHTML += `
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                        <p><strong>Path Found:</strong> ${startRoom.name} → ${endRoom.name}</p>
+                        <p><strong>Distance:</strong> ${Math.round(totalDistance)} units</p>
+                        <p><strong>Route:</strong> ${path.length} navigation points</p>
+                    </div>
+                `;
+            } else {
+                alert('No path found between the selected locations.');
+            }
+            
+            showLoading(false);
+        }
+
+        // Draw path on SVG
+        function drawPath(path) {
+            for (let i = 0; i < path.length - 1; i++) {
+                const startNode = document.getElementById(path[i]);
+                const endNode = document.getElementById(path[i + 1]);
+                
+                if (startNode && endNode) {
+                    // Draw line between nodes
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('class', 'path-line');
+                    line.setAttribute('x1', startNode.getAttribute('cx'));
+                    line.setAttribute('y1', startNode.getAttribute('cy'));
+                    line.setAttribute('x2', endNode.getAttribute('cx'));
+                    line.setAttribute('y2', endNode.getAttribute('cy'));
+                    svgDoc.appendChild(line);
+                    
+                    // Highlight nodes
+                    startNode.classList.add('path-node');
+                    endNode.classList.add('path-node');
+                }
+            }
+        }
+
+        // Clear current path
+        function clearPath() {
+            // Remove path lines
+            const pathLines = svgDoc.querySelectorAll('.path-line');
+            pathLines.forEach(line => line.remove());
+            
+            // Remove node highlighting
+            const pathNodes = svgDoc.querySelectorAll('.node.path-node');
+            pathNodes.forEach(node => node.classList.remove('path-node'));
+        }
+
+        // Clear all selections
+        function clearSelection() {
+            // Clear room selections
+            if (selectedStart) {
+                svgDoc.getElementById(selectedStart)?.classList.remove('start');
+            }
+            if (selectedEnd) {
+                svgDoc.getElementById(selectedEnd)?.classList.remove('end');
+            }
+            
+            // Clear path
+            clearPath();
+            
+            // Reset state
+            selectedStart = null;
+            selectedEnd = null;
+            document.getElementById('findPathBtn').disabled = true;
+            document.getElementById('infoPanel').classList.remove('show');
+        }
+
+        // Loading indicator
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('show', show);
+        }
+
+    
+        // ===================== INITIALIZE APP =====================
+        window.addEventListener('load', initialize);
+    </script>
+</body>
+</html>
