@@ -39,8 +39,6 @@ Campus Navigation System is a smart, interactive web application designed to hel
 ✅ **Scalable Solution** - Cloud-based architecture  
 ✅ **User-Centric Design** - Intuitive interface for all users  
 
-## 📸 Screenshots
-*(Add your screenshots here)*
 
 ## 🏗️ Project Structure
 campus-navigation/
@@ -65,6 +63,11 @@ campus-navigation/
 3. **Calculate Path**: Click "Find Path" to see optimal route
 4. **Save History**: Login to save paths to your personal history
 5. **View History**: Access your previous navigation routes
+
+## Our Future Aim
+With the limited time we have managed to build a base model of our idea. In future if we get a chance we can make it a fully fledged application for the entire college including all the floors, name for each room, description of each room, maybe can also link your timetable to the app so it can automatically tell you where your next lecture is. Can also make a 3D render of the college building instead of using a 2D map. So many more unique and interesting ideas we have got for this project but the time limits us.
+
+Anyways, we had these ideas in our head for the longest time since last year and because of this competition we got a chance to bring it to existence. 
 
 ## 🛠️ Setup Instructions
 ### Prerequisites
