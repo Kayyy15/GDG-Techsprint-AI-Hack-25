@@ -42,12 +42,12 @@ Campus Navigation System is a smart, interactive web application designed to hel
 
 ## 🏗️ Project Structure
 campus-navigation/
-├── index.html # Main application file
-├── README.md # This file
-├── assets/ # Images, icons, etc.
-│ ├── screenshots/
-│ └── campus-map.svg
-└── firebase-config/ # Firebase configuration files
+- ├── index.html # Main application file
+- ├── README.md # This file
+- ├── assets/ # Images, icons, etc.
+- │ ├── screenshots/
+- │ └── campus-map.svg
+- └── firebase-config/ # Firebase configuration files
 
 ## 🔥 Firebase Integration
 | Firebase Service | Purpose |
